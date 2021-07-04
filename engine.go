@@ -108,11 +108,26 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			en.PushCurOpera(exprStr, operas, numbs)
 			continue
 		}
-		numbs.Push(args[exprStr])
+		numbs.Push(GetArg(exprStr, args))
 	}
 	en.CalculateStack(operas, numbs)
 	result, _ := numbs.Pop()
 	return result
+}
+
+func GetArg(path string, args map[string]interface{}) interface{} {
+	idx := strings.Index(path, ".")
+	if idx < 0 {
+		return args[path]
+	}
+	if args[path[:idx]] == nil {
+		return nil
+	}
+	tmpArgs, ok := args[path[:idx]].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return GetArg(path[idx+1:], tmpArgs)
 }
 
 // 23+46*56-5*(-4-6) IN [1,2,3+4]

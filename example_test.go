@@ -28,3 +28,14 @@ func TestSpitExpr(t *testing.T) {
 		fmt.Println(v)
 	}
 }
+
+func TestGetArgs(t *testing.T) {
+	var mp = map[string]interface{}{
+		"user": map[string]interface{}{
+			"name": "kiteee",
+			"age":  50,
+		},
+	}
+	va := GetArg("user.name", mp)
+	fmt.Println(va)
+}
