@@ -1,6 +1,7 @@
 package goexpr
 
 import (
+	"bytes"
 	"fmt"
 	lls "github.com/emirpasic/gods/stacks/linkedliststack"
 	"regexp"
@@ -66,6 +67,7 @@ func (en *Engine) AddInfix(fname string, priority int32, op InfixOp) {
 
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expression(expression)
+	fmt.Println(exprs)
 	numbs := lls.New()
 	operas := lls.New()
 	for _, exprStr := range exprs {
@@ -73,7 +75,7 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			numbs.Push(numb)
 			continue
 		}
-		if exprStr != "'" && strings.HasPrefix(exprStr, "'") && strings.HasSuffix(exprStr, "'") {
+		if exprStr != "'" && hasPreSufix(exprStr, "'", "'") {
 			numbs.Push(exprStr[1 : len(exprStr)-1])
 			continue
 		}
@@ -115,6 +117,10 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 	return result
 }
 
+func hasPreSufix(exprs string, s string, e string) bool {
+	return strings.HasPrefix(exprs, s) && strings.HasSuffix(exprs, e)
+}
+
 func GetArg(path string, args map[string]interface{}) interface{} {
 	idx := strings.Index(path, ".")
 	if idx < 0 {
@@ -130,7 +136,7 @@ func GetArg(path string, args map[string]interface{}) interface{} {
 	return GetArg(path[idx+1:], tmpArgs)
 }
 
-// 23+46*56-5*(-4-6) IN [1,2,3+4]
+// 23+46*56-5*Add(-4-6) IN [1,2,3+4]
 func (eng *Engine) expression(exprs string) []string {
 	var idx = 0
 	var exprLen = len(exprs)
@@ -152,22 +158,25 @@ func (eng *Engine) expression(exprs string) []string {
 			preFix = exprList[len(exprList)-1]
 		}
 		if exprs[idx] == '-' && eng.IsNgvFlag(preFix) {
-			reg, _ := regexp.Compile(`^-\s*[0-9]+\.*[0-9]*`)
-			if numb := reg.FindString(exprs[idx:]); len(numb) > 0 {
-				idx += len(numb)
-				numb = strings.ReplaceAll(numb, " ", "")
-				exprList = append(exprList, numb)
-				continue
-			}
+			idx += 1
+			exprList = append(exprList, Ngv)
+			continue
+		}
+		reg, _ := regexp.Compile(`^\s*[0-9]+\.*[0-9]*`)
+		if numb := reg.FindString(exprs[idx:]); len(numb) > 0 {
+			idx += len(numb)
+			numb = strings.ReplaceAll(numb, " ", "")
+			exprList = append(exprList, numb)
+			continue
 		}
 		if eng.functionSet[preFix] != nil {
-			argExpr := matchBracket(exprs[idx:], "(", ")")
+			argExpr := match(exprs[idx:], "(", ")")
 			idx += len(argExpr)
 			exprList = append(exprList, argExpr)
 			continue
 		}
 		if string(exprs[idx]) == "[" {
-			array := matchBracket(exprs[idx:], "[", "]")
+			array := match(exprs[idx:], "[", "]")
 			idx += len(array)
 			exprList = append(exprList, array)
 			continue
@@ -179,7 +188,7 @@ func (eng *Engine) expression(exprs string) []string {
 			exprList = append(exprList, str)
 			continue
 		}
-		reg, _ := regexp.Compile(`^[0-9]+\.*[0-9]*`)
+		reg, _ = regexp.Compile(`^[0-9]+\.*[0-9]*`)
 		if numb := reg.FindString(exprs[idx:]); len(numb) > 0 {
 			idx += len(numb)
 			exprList = append(exprList, numb)
@@ -259,56 +268,43 @@ func (eng *Engine) IsNgvFlag(exprStr string) bool {
 	return exprStr == "(" || exprStr == "" || exprStr == "[" || exprStr == "," || eng.infixSet[exprStr] != nil || eng.prefixSet[exprStr] != nil
 }
 
+// ('ssss','aaa',['aaa',bb],[aaa,game notIn values],funa bsna ( sa,ssdf), atype contains (90),type notIn [1,2,4],value >= images ,-add(),[name,add()],-otEs(),[[-aaam,bb],bbb])
 func SpitExpr(exprs string) []string {
 	exprs = exprs[1 : len(exprs)-1]
 	var exprList []string
+	idx := 0
 	for {
-		exprs = strings.TrimSpace(exprs)
-		if len(exprs) == 0 {
+		if idx >= len(exprs) {
 			break
 		}
-		if strings.HasPrefix(exprs, "[") {
-			item := matchBracket(exprs, "[", "]")
-			exprList = append(exprList, item)
-			exprs = exprs[len(item):]
-			continue
+		buf := &bytes.Buffer{}
+		jdx := idx
+		for {
+			if jdx >= len(exprs) {
+				break
+			}
+			if exprs[jdx] == ',' {
+				jdx++
+				break
+			}
+			if exprs[jdx] == '[' {
+				exprStr := match(exprs[jdx:], "[", "]")
+				jdx += len(exprStr)
+				buf.WriteString(exprStr)
+				continue
+			}
+			if exprs[jdx] == '(' {
+				exprStr := match(exprs[jdx:], "(", ")")
+				jdx += len(exprStr)
+				buf.WriteString(exprStr)
+				continue
+			}
+			buf.WriteByte(exprs[jdx])
+			jdx++
 		}
-		if strings.HasPrefix(exprs, "(") {
-			item := matchBracket(exprs, "[", "]")
-			exprList = append(exprList, item)
-			exprs = exprs[len(item):]
-			continue
-		}
-		spitIdx := strings.Index(exprs, ",")
-		if spitIdx == 0 {
-			exprs = exprs[1:]
-			continue
-		}
-		reg, _ := regexp.Compile(`^[^,\[\]\(\)]*?\[`)
-		exprBegin := reg.FindString(exprs)
-		if len(exprBegin) > 0 {
-			argLen := matchBracket(exprs[len(exprBegin)-1:], "[", "]")
-			exprStr := exprs[:len(argLen)+len(exprBegin)-1]
-			exprList = append(exprList, exprStr)
-			exprs = exprs[len(exprStr):]
-			continue
-		}
-		reg, _ = regexp.Compile(`^[^,\[\]\(\)]*?\(`)
-		exprBegin = reg.FindString(exprs)
-		if len(exprBegin) > 0 {
-			argLen := matchBracket(exprs[len(exprBegin)-1:], "(", ")")
-			exprStr := exprs[:len(argLen)+len(exprBegin)-1]
-			exprList = append(exprList, exprStr)
-			exprs = exprs[len(exprStr):]
-			continue
-		}
-		if spitIdx < 0 {
-			exprList = append(exprList, exprs)
-			break
-		}
-		variableNumb := exprs[:spitIdx]
-		exprList = append(exprList, variableNumb)
-		exprs = exprs[len(variableNumb):]
+		exprStr := strings.TrimSpace(buf.String())
+		exprList = append(exprList, exprStr)
+		idx = jdx
 	}
 	return exprList
 }
@@ -369,9 +365,9 @@ func (eng *Engine) PushCurOpera(curOp string, opStack, nbStack *lls.Stack) {
 			opStack.Push(curOp)
 			break
 		}
-		topPriority := eng.priority[string(topOp)]
-		curPriority := eng.priority[string(curOp)]
-		if topPriority > curPriority {
+		topPty := eng.priority[topOp]
+		curPty := eng.priority[curOp]
+		if topPty > curPty {
 			opStack.Push(curOp)
 			break
 		}
@@ -414,7 +410,7 @@ func (eng *Engine) CalculateTop(opStack, nbStack *lls.Stack) {
 	panic(fmt.Sprintf("No find function '%v'", top))
 }
 
-func matchBracket(va string, left, right string) string {
+func match(va string, left, right string) string {
 	lCount := 0
 	rCount := 0
 	for idx, v := range va {

@@ -7,6 +7,7 @@ import (
 
 func TestEngine(t *testing.T) {
 	exprs := `(#3-4)<10&&4>1&&[1,2,4] Contain 4 && ADD(1,2)>1 && user.name=='kiteee' && user_count>20`
+	exprs = `-------1`
 	//exprs=`user.name=='kiteee' && user_count>20`
 	//exprs=`user_count>20 && user_count>20`
 	eg := NewEngine()
@@ -32,6 +33,7 @@ func TestEngine(t *testing.T) {
 
 func TestSpitExpr(t *testing.T) {
 	exprs := `('ssss','aaa',['aaa',bb],[aaa,game notIn values],funa bsna ( sa,ssdf), atype contains (90),type notIn [1,2,4],value >= images ,-add(),[name,add()],-otEs(),[[-aaam,bb],bbb])`
+	exprs = `()`
 	result := SpitExpr(exprs)
 	for _, v := range result {
 		fmt.Println(v)
