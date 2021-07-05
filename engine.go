@@ -73,8 +73,8 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			numbs.Push(numb)
 			continue
 		}
-		if strings.HasPrefix(exprStr, "'") {
-			numbs.Push(exprStr)
+		if exprStr != "'" && strings.HasPrefix(exprStr, "'") && strings.HasSuffix(exprStr, "'") {
+			numbs.Push(exprStr[1 : len(exprStr)-1])
 			continue
 		}
 		if len(exprStr) > 1 && strings.HasPrefix(exprStr, "(") {
@@ -174,7 +174,7 @@ func (eng *Engine) expression(exprs string) []string {
 		}
 		if strings.HasPrefix(exprs[idx:], "'") {
 			end := strings.Index(exprs[idx+1:], "'")
-			str := exprs[:end+2]
+			str := exprs[idx : idx+end+2]
 			idx += len(str)
 			exprList = append(exprList, str)
 			continue
@@ -220,6 +220,33 @@ func (eng *Engine) expression(exprs string) []string {
 			variable = reg1.ReplaceAllString(variable, "")
 			idx += len(variable)
 			exprList = append(exprList, variable)
+			continue
+		}
+		var minOpIdx = -1
+		for _, op := range eng.operaSet {
+			opIdx := strings.Index(exprs[idx:], op)
+			if opIdx < 0 {
+				continue
+			}
+			if reg1.MatchString(op) {
+				reg2, _ := regexp.Compile(fmt.Sprintf(`[^A-Za-z]?%v[^A-Za-z]`, op))
+				begin := idx + opIdx
+				if idx > 0 {
+					begin = begin - 1
+				}
+				if !reg2.MatchString(exprs[begin:]) {
+					continue
+				}
+			}
+			if (minOpIdx == -1 || opIdx < minOpIdx) || (opIdx == minOpIdx && opIdx >= 0 && len(opera) < len(op)) {
+				minOpIdx = opIdx
+				opera = op
+			}
+		}
+		if len(opera) > 0 {
+			variable := exprs[idx : idx+minOpIdx]
+			exprList = append(exprList, variable)
+			idx += len(variable)
 			continue
 		}
 		exprList = append(exprList, strings.TrimSpace(exprs[idx:]))

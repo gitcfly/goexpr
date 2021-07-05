@@ -6,7 +6,9 @@ import (
 )
 
 func TestEngine(t *testing.T) {
-	exprs := `(#3-4)<10&&4>1&&[1,2,4] Contain 4 && ADD(1,2)>1`
+	exprs := `(#3-4)<10&&4>1&&[1,2,4] Contain 4 && ADD(1,2)>1 && user.name=='kiteee' && user_count>20`
+	//exprs=`user.name=='kiteee' && user_count>20`
+	//exprs=`user_count>20 && user_count>20`
 	eg := NewEngine()
 	eg.AddFunc("ADD", 10, func(v ...interface{}) interface{} {
 		return floatVal(v[0]) + floatVal(v[1])
@@ -17,7 +19,14 @@ func TestEngine(t *testing.T) {
 	eg.AddInfix("Contain", 50, func(v1, v2 interface{}) interface{} {
 		return Contain(v1, v2)
 	})
-	result := eg.Execute(exprs, map[string]interface{}{"ImageMode": 12, "TplIds": []float64{10025, 20}})
+	var params = map[string]interface{}{
+		"user": map[string]interface{}{
+			"name": "kiteee",
+			"age":  50,
+		},
+		"user_count": 30,
+	}
+	result := eg.Execute(exprs, params)
 	fmt.Println(result)
 }
 
