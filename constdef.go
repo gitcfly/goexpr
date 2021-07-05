@@ -7,6 +7,16 @@ import (
 )
 
 const (
+	Variable string = "vb"
+	Func     string = "fu"
+	Unary    string = "up"
+	Binary   string = "bn"
+	Value    string = "va"
+	Array    string = "arr"
+	Args     string = "arg"
+)
+
+const (
 	Equal      string = "=="
 	IN         string = "IN"
 	NotIN      string = "NotIN"

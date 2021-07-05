@@ -11,6 +11,11 @@ import (
 	"unicode"
 )
 
+type Token struct {
+	Value string
+	Type  string
+}
+
 type Engine struct {
 	priority    map[string]int32
 	prefixSet   map[string]PrefixOp
@@ -66,23 +71,26 @@ func (en *Engine) AddInfix(fname string, priority int32, op InfixOp) {
 }
 
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
-	exprs := en.expression(expression)
-	fmt.Println(exprs)
+	exprs := en.expressionV2(expression)
+	for _, v := range exprs {
+		fmt.Print(v.Value + " ")
+	}
+	fmt.Println("")
 	numbs := lls.New()
 	operas := lls.New()
-	for _, exprStr := range exprs {
-		if numb, ok := GetNumber(exprStr); ok {
+	for _, expr := range exprs {
+		value := expr.Value
+		if numb, ok := GetNumber(value); ok {
 			numbs.Push(numb)
 			continue
 		}
-		if exprStr != "'" && hasPreSufix(exprStr, "'", "'") {
-			numbs.Push(exprStr[1 : len(exprStr)-1])
+		if value != "'" && hasPreSufix(value, "'", "'") {
+			numbs.Push(value[1 : len(value)-1])
 			continue
 		}
-		if len(exprStr) > 1 && strings.HasPrefix(exprStr, "(") {
-			exprList := SpitExpr(exprStr)
-			top, _ := operas.Peek()
-			if top != nil && en.functionSet[top.(string)] != nil {
+		if expr.Type == Args {
+			exprList := SpitExpr(value)
+			if top, _ := operas.Peek(); top != nil {
 				en.funcArgs[top.(string)] = len(exprList)
 			}
 			for _, tempExpr := range exprList {
@@ -91,9 +99,9 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			}
 			continue
 		}
-		if strings.HasPrefix(exprStr, "[") {
+		if expr.Type == Array {
 			var array []interface{}
-			exprList := SpitExpr(exprStr)
+			exprList := SpitExpr(value)
 			for _, tempExpr := range exprList {
 				numb := en.Execute(tempExpr, args)
 				array = append(array, numb)
@@ -101,16 +109,16 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			numbs.Push(array)
 			continue
 		}
-		if exprStr == ")" {
+		if value == ")" {
 			//计算括号内部的,直到计算到(
 			en.CalculateBract(operas, numbs)
 			continue
 		}
-		if Has(en.operaSet, exprStr) {
-			en.PushCurOpera(exprStr, operas, numbs)
+		if Has(en.operaSet, value) {
+			en.PushCurOpera(expr, operas, numbs)
 			continue
 		}
-		numbs.Push(GetArg(exprStr, args))
+		numbs.Push(GetArg(value, args))
 	}
 	en.CalculateStack(operas, numbs)
 	result, _ := numbs.Pop()
@@ -136,11 +144,12 @@ func GetArg(path string, args map[string]interface{}) interface{} {
 	return GetArg(path[idx+1:], tmpArgs)
 }
 
+// 变量，数组，数字，字符串，操作符，括号
 // 23+46*56-5*Add(-4-6) IN [1,2,3+4]
-func (eng *Engine) expression(exprs string) []string {
+func (eng *Engine) expressionV2(exprs string) []*Token {
 	var idx = 0
 	var exprLen = len(exprs)
-	var exprList []string
+	var exprList []*Token
 	sort.Slice(eng.operaSet, func(i, j int) bool {
 		return len(eng.operaSet[i]) > len(eng.operaSet[j])
 	})
@@ -153,115 +162,92 @@ func (eng *Engine) expression(exprs string) []string {
 			idx++
 			continue
 		}
-		preFix := ""
+		var pToken *Token
 		if len(exprList) > 0 {
-			preFix = exprList[len(exprList)-1]
+			pToken = exprList[len(exprList)-1]
 		}
-		if exprs[idx] == '-' && eng.IsNgvFlag(preFix) {
+		if exprs[idx] == '-' && eng.IsNgvToken(pToken) {
 			idx += 1
-			exprList = append(exprList, Ngv)
-			continue
-		}
-		reg, _ := regexp.Compile(`^\s*[0-9]+\.*[0-9]*`)
-		if numb := reg.FindString(exprs[idx:]); len(numb) > 0 {
-			idx += len(numb)
-			numb = strings.ReplaceAll(numb, " ", "")
-			exprList = append(exprList, numb)
-			continue
-		}
-		if eng.functionSet[preFix] != nil {
-			argExpr := match(exprs[idx:], "(", ")")
-			idx += len(argExpr)
-			exprList = append(exprList, argExpr)
-			continue
-		}
-		if string(exprs[idx]) == "[" {
-			array := match(exprs[idx:], "[", "]")
-			idx += len(array)
-			exprList = append(exprList, array)
+			exprList = append(exprList, &Token{Value: "-", Type: Unary})
 			continue
 		}
 		if strings.HasPrefix(exprs[idx:], "'") {
 			end := strings.Index(exprs[idx+1:], "'")
 			str := exprs[idx : idx+end+2]
 			idx += len(str)
-			exprList = append(exprList, str)
+			exprList = append(exprList, &Token{Value: str, Type: Value})
 			continue
 		}
-		reg, _ = regexp.Compile(`^[0-9]+\.*[0-9]*`)
-		if numb := reg.FindString(exprs[idx:]); len(numb) > 0 {
+		if string(exprs[idx]) == "[" {
+			array := match(exprs[idx:], "[", "]")
+			idx += len(array)
+			exprList = append(exprList, &Token{Value: array, Type: Array})
+			continue
+		}
+		if pToken != nil && pToken.Type == Func {
+			argExpr := match(exprs[idx:], "(", ")")
+			idx += len(argExpr)
+			exprList = append(exprList, &Token{Value: argExpr, Type: Args})
+			continue
+		}
+		numbReg, _ := regexp.Compile(`^[0-9]+\.*[0-9]*`)
+		if numb := numbReg.FindString(exprs[idx:]); len(numb) > 0 {
 			idx += len(numb)
-			exprList = append(exprList, numb)
+			exprList = append(exprList, &Token{Value: numb, Type: Value})
 			continue
 		}
-		var opera = ""
-		reg, _ = regexp.Compile(`^[^A-Za-z0-9_]`)
-		reg1, _ := regexp.Compile(`[A-Za-z][A-Za-z0-9]*`)
+		varReg, _ := regexp.Compile(`^[A-Za-z][A-Za-z0-9\._]*`)
+		if expr := varReg.FindString(exprs[idx:]); expr != "" {
+			// 变量名或者函数名或者一元操作或者二元操作
+			idx += len(expr)
+			exprList = append(exprList, eng.GetToken(expr))
+			continue
+		}
+		var opera string
 		for _, op := range eng.operaSet {
-			if !strings.HasPrefix(exprs[idx:], op) {
-				continue
-			}
-			if reg1.MatchString(op) && !reg.MatchString(exprs[len(op):]) {
-				continue
-			}
-			opera = op
-			break
-		}
-		if len(opera) > 0 {
-			if opera == "-" && !eng.IsNgvFlag(preFix) {
-				opera = Sub
-			}
-			idx += len(opera)
-			exprList = append(exprList, opera)
-			continue
-		}
-		reg, _ = regexp.Compile(`^[A-Za-z][A-za-z0-9]*[,\s\)\]]`)
-		if variable := reg.FindString(exprs[idx:]); len(variable) > 0 {
-			reg1, _ := regexp.Compile(`[,\s\)\]]*$`)
-			variable = reg1.ReplaceAllString(variable, "")
-			idx += len(variable)
-			exprList = append(exprList, variable)
-			continue
-		}
-		reg, _ = regexp.Compile(`^[A-Za-z][A-za-z0-9]*[,\s\)\]]$`)
-		if variable := reg.FindString(exprs[idx:]); len(variable) > 0 {
-			reg1, _ := regexp.Compile(`[,\s\)\]]*$`)
-			variable = reg1.ReplaceAllString(variable, "")
-			idx += len(variable)
-			exprList = append(exprList, variable)
-			continue
-		}
-		var minOpIdx = -1
-		for _, op := range eng.operaSet {
-			opIdx := strings.Index(exprs[idx:], op)
-			if opIdx < 0 {
-				continue
-			}
-			if reg1.MatchString(op) {
-				reg2, _ := regexp.Compile(fmt.Sprintf(`[^A-Za-z]?%v[^A-Za-z]`, op))
-				begin := idx + opIdx
-				if idx > 0 {
-					begin = begin - 1
-				}
-				if !reg2.MatchString(exprs[begin:]) {
-					continue
-				}
-			}
-			if (minOpIdx == -1 || opIdx < minOpIdx) || (opIdx == minOpIdx && opIdx >= 0 && len(opera) < len(op)) {
-				minOpIdx = opIdx
+			if strings.HasPrefix(exprs[idx:], op) {
 				opera = op
+				break
 			}
 		}
-		if len(opera) > 0 {
-			variable := exprs[idx : idx+minOpIdx]
-			exprList = append(exprList, variable)
-			idx += len(variable)
+		if opera != "" {
+			idx += len(opera)
+			exprList = append(exprList, eng.GetToken(opera))
 			continue
 		}
-		exprList = append(exprList, strings.TrimSpace(exprs[idx:]))
+		exprList = append(exprList, &Token{Value: exprs[idx:]})
 		break
 	}
 	return exprList
+}
+
+func (eng *Engine) GetToken(expr string) *Token {
+	if expr == "" {
+		return nil
+	}
+	if eng.functionSet[expr] != nil {
+		return &Token{Value: expr, Type: Func}
+	}
+	if eng.prefixSet[expr] != nil {
+		return &Token{Value: expr, Type: Unary}
+	}
+	if eng.infixSet[expr] != nil {
+		return &Token{Value: expr, Type: Binary}
+	}
+	return &Token{Value: expr, Type: Variable}
+}
+
+func (eng *Engine) IsNgvToken(tk *Token) bool {
+	if tk == nil {
+		return true
+	}
+	if tk.Type == Func || tk.Type == Unary || tk.Type == Binary {
+		return true
+	}
+	if tk.Value == "(" || tk.Value == "[" || tk.Value == "," {
+		return true
+	}
+	return false
 }
 
 func (eng *Engine) IsNgvFlag(exprStr string) bool {
@@ -341,7 +327,8 @@ func (eng *Engine) CalculateBract(opStack, nbStack *lls.Stack) {
 	}
 }
 
-func (eng *Engine) PushCurOpera(curOp string, opStack, nbStack *lls.Stack) {
+func (eng *Engine) PushCurOpera(curTk *Token, opStack, nbStack *lls.Stack) {
+	curOp := curTk.Value
 	if opStack.Empty() {
 		opStack.Push(curOp)
 		return
@@ -357,11 +344,11 @@ func (eng *Engine) PushCurOpera(curOp string, opStack, nbStack *lls.Stack) {
 			opStack.Push(curOp)
 			break
 		}
-		if eng.prefixSet[curOp] != nil {
+		if curTk.Type == Unary {
 			opStack.Push(curOp)
 			break
 		}
-		if eng.functionSet[curOp] != nil {
+		if curTk.Type == Func {
 			opStack.Push(curOp)
 			break
 		}
