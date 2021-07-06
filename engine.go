@@ -68,6 +68,10 @@ func (en *Engine) AddInfix(fname string, priority int32, op InfixOp) {
 	en.operaSet = append(en.operaSet, fname)
 }
 
+func (en *Engine) SetPriority(infix string, priority int32) {
+	en.priority[infix] = priority
+}
+
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expressionV2(expression)
 	for _, v := range exprs {
