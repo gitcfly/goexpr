@@ -33,7 +33,6 @@ const (
 	And        string = "&&"
 	Or         string = "||"
 	Not        string = "!"
-	Ngv        string = "-"
 	BraktLeft  string = "("
 	BraktRight string = ")"
 	ArrayLeft  string = "["
@@ -41,22 +40,21 @@ const (
 )
 
 var OpPriority = map[string]int32{
-	Not:        20,
-	Mult:       30,
-	Div:        30,
-	Rest:       30,
-	Add:        40,
-	Sub:        40,
-	IN:         50,
-	NotIN:      50,
-	Above:      60,
-	AboveEqual: 60,
-	Less:       60,
-	LessEqual:  60,
-	Equal:      70,
-	NotEqual:   70,
-	And:        110,
-	Or:         120,
+	Mult:       60,
+	Div:        60,
+	Rest:       60,
+	Add:        50,
+	Sub:        50,
+	Above:      40,
+	AboveEqual: 40,
+	Less:       40,
+	LessEqual:  40,
+	Equal:      40,
+	NotEqual:   40,
+	IN:         30,
+	NotIN:      30,
+	And:        20,
+	Or:         10,
 }
 
 // 函数运算

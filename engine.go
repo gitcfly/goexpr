@@ -52,15 +52,13 @@ func NewEngine() *Engine {
 	}
 }
 
-func (en *Engine) AddFunc(fname string, priority int32, op FunctionOp) {
+func (en *Engine) AddFunc(fname string, op FunctionOp) {
 	en.functionSet[fname] = op
-	en.priority[fname] = priority
 	en.operaSet = append(en.operaSet, fname)
 }
 
-func (en *Engine) AddPrefix(fname string, priority int32, op PrefixOp) {
+func (en *Engine) AddPrefix(fname string, op PrefixOp) {
 	en.prefixSet[fname] = op
-	en.priority[fname] = priority
 	en.operaSet = append(en.operaSet, fname)
 }
 
@@ -81,6 +79,14 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 		value := expr.Value
 		if numb, ok := GetNumber(value); ok {
 			numbs.Push(numb)
+			continue
+		}
+		if value == "true" {
+			numbs.Push(true)
+			continue
+		}
+		if value == "false" {
+			numbs.Push(false)
 			continue
 		}
 		if value != "'" && hasPreSufix(value, "'", "'") {
@@ -360,7 +366,7 @@ func (eng *Engine) PushCurOpera(curTk *Token, opStack, nbStack *lls.Stack) {
 		}
 		topPty := eng.priority[topTk.Value]
 		curPty := eng.priority[curTk.Value]
-		if topPty > curPty {
+		if topPty < curPty {
 			opStack.Push(curTk)
 			break
 		}
