@@ -31,6 +31,7 @@ func TestEngine(t *testing.T) {
 		},
 		"user_count": 30,
 	}
+	//eg.SetPriority("NotIN", 30)
 	result := eg.Execute(exprs, params)
 	fmt.Println(result)
 }
