@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	Variable string = "vb"
-	Func     string = "fu"
-	Unary    string = "up"
-	Binary   string = "bn"
-	Value    string = "va"
-	Array    string = "arr"
-	Args     string = "arg"
+	Variable string = "Variable"
+	Func     string = "function"
+	PreOp    string = "prefixOp"
+	InfxOp   string = "infixOp"
+	Value    string = "value"
+	Array    string = "array"
+	Args     string = "funcArgs"
 )
 
 const (
@@ -33,7 +33,7 @@ const (
 	And        string = "&&"
 	Or         string = "||"
 	Not        string = "!"
-	Ngv        string = "~"
+	Ngv        string = "-"
 	BraktLeft  string = "("
 	BraktRight string = ")"
 	ArrayLeft  string = "["
@@ -42,7 +42,6 @@ const (
 
 var OpPriority = map[string]int32{
 	Not:        20,
-	Ngv:        20,
 	Mult:       30,
 	Div:        30,
 	Rest:       30,
@@ -73,7 +72,7 @@ var PrefixOpSet = map[string]PrefixOp{
 	Not: func(v1 interface{}) interface{} {
 		return !v1.(bool)
 	},
-	Ngv: func(v interface{}) interface{} {
+	Sub: func(v interface{}) interface{} {
 		return -floatVal(v)
 	},
 }

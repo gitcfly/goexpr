@@ -73,9 +73,8 @@ func (en *Engine) AddInfix(fname string, priority int32, op InfixOp) {
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expressionV2(expression)
 	for _, v := range exprs {
-		fmt.Print(v.Value + " ")
+		fmt.Println(v.Value + " " + v.Type)
 	}
-	fmt.Println("")
 	numbs := lls.New()
 	operas := lls.New()
 	for _, expr := range exprs {
@@ -91,7 +90,7 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 		if expr.Type == Args {
 			exprList := SpitExpr(value)
 			if top, _ := operas.Peek(); top != nil {
-				en.funcArgs[top.(string)] = len(exprList)
+				en.funcArgs[top.(*Token).Value] = len(exprList)
 			}
 			for _, tempExpr := range exprList {
 				numb := en.Execute(tempExpr, args)
@@ -109,7 +108,7 @@ func (en *Engine) Execute(expression string, args map[string]interface{}) interf
 			numbs.Push(array)
 			continue
 		}
-		if value == ")" {
+		if value == BraktRight {
 			//计算括号内部的,直到计算到(
 			en.CalculateBract(operas, numbs)
 			continue
@@ -166,9 +165,13 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		if len(exprList) > 0 {
 			pToken = exprList[len(exprList)-1]
 		}
-		if exprs[idx] == '-' && eng.IsNgvToken(pToken) {
+		if exprs[idx] == '-' {
 			idx += 1
-			exprList = append(exprList, &Token{Value: "-", Type: Unary})
+			if eng.IsNgvToken(pToken) {
+				exprList = append(exprList, &Token{Value: "-", Type: PreOp})
+				continue
+			}
+			exprList = append(exprList, &Token{Value: "-", Type: InfxOp})
 			continue
 		}
 		if strings.HasPrefix(exprs[idx:], "'") {
@@ -229,10 +232,10 @@ func (eng *Engine) GetToken(expr string) *Token {
 		return &Token{Value: expr, Type: Func}
 	}
 	if eng.prefixSet[expr] != nil {
-		return &Token{Value: expr, Type: Unary}
+		return &Token{Value: expr, Type: PreOp}
 	}
 	if eng.infixSet[expr] != nil {
-		return &Token{Value: expr, Type: Binary}
+		return &Token{Value: expr, Type: InfxOp}
 	}
 	return &Token{Value: expr, Type: Variable}
 }
@@ -241,7 +244,7 @@ func (eng *Engine) IsNgvToken(tk *Token) bool {
 	if tk == nil {
 		return true
 	}
-	if tk.Type == Func || tk.Type == Unary || tk.Type == Binary {
+	if tk.Type == Func || tk.Type == PreOp || tk.Type == InfxOp {
 		return true
 	}
 	if tk.Value == "(" || tk.Value == "[" || tk.Value == "," {
@@ -316,46 +319,49 @@ func (eng *Engine) CalculateStack(opStack, nbStack *lls.Stack) {
 func (eng *Engine) CalculateBract(opStack, nbStack *lls.Stack) {
 	for {
 		top, _ := opStack.Peek()
-		if top == BraktLeft {
-			opStack.Pop()
-			break
-		}
 		if top == nil {
 			panic("you expr miss left (")
+		}
+		if top.(*Token).Value == BraktLeft {
+			opStack.Pop()
+			break
 		}
 		eng.CalculateTop(opStack, nbStack)
 	}
 }
 
 func (eng *Engine) PushCurOpera(curTk *Token, opStack, nbStack *lls.Stack) {
-	curOp := curTk.Value
-	if opStack.Empty() {
-		opStack.Push(curOp)
-		return
-	}
 	for {
 		top, _ := opStack.Peek()
 		if top == nil {
-			opStack.Push(curOp)
+			opStack.Push(curTk)
 			break
 		}
-		topOp := top.(string)
-		if topOp == BraktLeft || topOp == ArrayLeft {
-			opStack.Push(curOp)
+		if curTk.Value == BraktLeft || curTk.Value == ArrayLeft {
+			opStack.Push(curTk)
 			break
 		}
-		if curTk.Type == Unary {
-			opStack.Push(curOp)
+		topTk := top.(*Token)
+		if topTk.Value == BraktLeft || topTk.Value == ArrayLeft {
+			opStack.Push(curTk)
+			break
+		}
+		if curTk.Type == PreOp {
+			opStack.Push(curTk)
 			break
 		}
 		if curTk.Type == Func {
-			opStack.Push(curOp)
+			opStack.Push(curTk)
 			break
 		}
-		topPty := eng.priority[topOp]
-		curPty := eng.priority[curOp]
+		if topTk.Type == PreOp || topTk.Type == Func {
+			eng.CalculateTop(opStack, nbStack)
+			continue
+		}
+		topPty := eng.priority[topTk.Value]
+		curPty := eng.priority[curTk.Value]
 		if topPty > curPty {
-			opStack.Push(curOp)
+			opStack.Push(curTk)
 			break
 		}
 		eng.CalculateTop(opStack, nbStack)
@@ -367,7 +373,17 @@ func (eng *Engine) CalculateTop(opStack, nbStack *lls.Stack) {
 	if top == nil {
 		return
 	}
-	if fun, ok := eng.infixSet[top.(string)]; ok {
+	topTk := top.(*Token)
+	if topTk.Type == PreOp {
+		fun := eng.prefixSet[topTk.Value]
+		numb1, _ := nbStack.Pop()
+		result := fun(numb1)
+		nbStack.Push(result)
+		opStack.Pop()
+		return
+	}
+	if topTk.Type == InfxOp {
+		fun := eng.infixSet[topTk.Value]
 		numb1, _ := nbStack.Pop()
 		numb2, _ := nbStack.Pop()
 		result := fun(numb2, numb1)
@@ -375,15 +391,9 @@ func (eng *Engine) CalculateTop(opStack, nbStack *lls.Stack) {
 		opStack.Pop()
 		return
 	}
-	if fun, ok := eng.prefixSet[top.(string)]; ok {
-		numb1, _ := nbStack.Pop()
-		result := fun(numb1)
-		nbStack.Push(result)
-		opStack.Pop()
-		return
-	}
-	if fun, ok := eng.functionSet[top.(string)]; ok {
-		argCount := eng.funcArgs[top.(string)]
+	if topTk.Type == Func {
+		fun := eng.functionSet[topTk.Value]
+		argCount := eng.funcArgs[topTk.Value]
 		var params = make([]interface{}, argCount)
 		for i := 0; i < argCount; i++ {
 			numb, _ := nbStack.Pop()
