@@ -74,9 +74,6 @@ func (en *Engine) SetPriority(infix string, priority int32) {
 
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expressionV2(expression)
-	for _, v := range exprs {
-		fmt.Println(v.Value + " " + v.Type)
-	}
 	numbs := lls.New()
 	operas := lls.New()
 	for _, expr := range exprs {
@@ -175,13 +172,13 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		if len(exprList) > 0 {
 			pToken = exprList[len(exprList)-1]
 		}
-		if exprs[idx] == '-' {
+		if string(exprs[idx]) == Sub {
 			idx += 1
-			if eng.IsNgvToken(pToken) {
-				exprList = append(exprList, &Token{Value: "-", Type: PreOp})
+			if eng.IsPrefixOp(pToken) {
+				exprList = append(exprList, &Token{Value: Sub, Type: PreOp})
 				continue
 			}
-			exprList = append(exprList, &Token{Value: "-", Type: InfxOp})
+			exprList = append(exprList, &Token{Value: Sub, Type: InfxOp})
 			continue
 		}
 		if strings.HasPrefix(exprs[idx:], "'") {
@@ -191,14 +188,14 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 			exprList = append(exprList, &Token{Value: str, Type: Value})
 			continue
 		}
-		if string(exprs[idx]) == "[" {
-			array := match(exprs[idx:], "[", "]")
+		if string(exprs[idx]) == ArrayLeft {
+			array := match(exprs[idx:], ArrayLeft, ArrayRight)
 			idx += len(array)
 			exprList = append(exprList, &Token{Value: array, Type: Array})
 			continue
 		}
 		if pToken != nil && pToken.Type == Func {
-			argExpr := match(exprs[idx:], "(", ")")
+			argExpr := match(exprs[idx:], BraktLeft, BraktRight)
 			idx += len(argExpr)
 			exprList = append(exprList, &Token{Value: argExpr, Type: Args})
 			continue
@@ -250,24 +247,19 @@ func (eng *Engine) GetToken(expr string) *Token {
 	return &Token{Value: expr, Type: Variable}
 }
 
-func (eng *Engine) IsNgvToken(tk *Token) bool {
+func (eng *Engine) IsPrefixOp(tk *Token) bool {
 	if tk == nil {
 		return true
 	}
 	if tk.Type == Func || tk.Type == PreOp || tk.Type == InfxOp {
 		return true
 	}
-	if tk.Value == "(" || tk.Value == "[" || tk.Value == "," {
+	if tk.Value == BraktLeft || tk.Value == ArrayLeft || tk.Value == ItemSpit {
 		return true
 	}
 	return false
 }
 
-func (eng *Engine) IsNgvFlag(exprStr string) bool {
-	return exprStr == "(" || exprStr == "" || exprStr == "[" || exprStr == "," || eng.infixSet[exprStr] != nil || eng.prefixSet[exprStr] != nil
-}
-
-// ('ssss','aaa',['aaa',bb],[aaa,game notIn values],funa bsna ( sa,ssdf), atype contains (90),type notIn [1,2,4],value >= images ,-add(),[name,add()],-otEs(),[[-aaam,bb],bbb])
 func SpitExpr(exprs string) []string {
 	exprs = exprs[1 : len(exprs)-1]
 	var exprList []string
@@ -282,18 +274,18 @@ func SpitExpr(exprs string) []string {
 			if jdx >= len(exprs) {
 				break
 			}
-			if exprs[jdx] == ',' {
+			if string(exprs[jdx]) == ItemSpit {
 				jdx++
 				break
 			}
-			if exprs[jdx] == '[' {
-				exprStr := match(exprs[jdx:], "[", "]")
+			if string(exprs[jdx]) == ArrayLeft {
+				exprStr := match(exprs[jdx:], ArrayLeft, ArrayRight)
 				jdx += len(exprStr)
 				buf.WriteString(exprStr)
 				continue
 			}
-			if exprs[jdx] == '(' {
-				exprStr := match(exprs[jdx:], "(", ")")
+			if string(exprs[jdx]) == BraktLeft {
+				exprStr := match(exprs[jdx:], BraktLeft, BraktRight)
 				jdx += len(exprStr)
 				buf.WriteString(exprStr)
 				continue

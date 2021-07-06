@@ -37,6 +37,7 @@ const (
 	BraktRight string = ")"
 	ArrayLeft  string = "["
 	ArrayRight string = "]"
+	ItemSpit   string = ","
 )
 
 var OpPriority = map[string]int32{
@@ -121,19 +122,6 @@ var InfixOpSet = map[string]InfixOp{
 	NotIN: func(v1 interface{}, v2 interface{}) interface{} {
 		return notIn(v1, v2)
 	},
-}
-
-func Contain(a, b interface{}) interface{} {
-	bStr := fmt.Sprint(b)
-	array := reflect.ValueOf(a)
-	length := array.Len()
-	for i := 0; i < length; i++ {
-		aStr := fmt.Sprint(array.Index(i).Interface())
-		if bStr == aStr {
-			return true
-		}
-	}
-	return false
 }
 
 func notIn(a, b interface{}) interface{} {

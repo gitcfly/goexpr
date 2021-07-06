@@ -2,11 +2,25 @@ package goexpr
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
+func Contain(a, b interface{}) interface{} {
+	bStr := fmt.Sprint(b)
+	array := reflect.ValueOf(a)
+	length := array.Len()
+	for i := 0; i < length; i++ {
+		aStr := fmt.Sprint(array.Index(i).Interface())
+		if bStr == aStr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestEngine(t *testing.T) {
-	exprs := `4+3>5&&5<4+5&&3NotIN[1,2,4]&&ADD(1,2)<4&&-(#-3-4)<=30&&4>1&&[1,2,4] Contain 4 && ADD(1,2)!=1 && user.name=='kiteee' && user_count>20`
+	exprs := `-4+3>(-9)&&5<4+5&&3NotIN[1,2,4]&&ADD(1,2)<4&&-(#-3-4)<=30&&4>1&&[1,2,4] Contain 4 && ADD(1,2)!=1 && user.name=='kiteee' && user_count>20`
 	//exprs = `-------1`
 	//exprs=`user.name=='kiteee' && user_count>20`
 	//exprs=`user_count>20 && user_count>20`
