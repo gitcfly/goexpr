@@ -20,7 +20,7 @@ func Contain(a, b interface{}) interface{} {
 }
 
 func TestEngine(t *testing.T) {
-	exprs := `-4+3>(-9)&&5<4+5&&3NotIN[1,2,4]&&ADD(1,2)<4&&-(#-3-4)<=30&&4>1&&[1,2,4] Contain 4 && ADD(1,2)!=1 && user.name=='kiteee' && user_count>20`
+	exprs := `(2)-4+3>(-9)&&5<4+5&&3NotIN[1,2,4]&&ADD(1,2)<4&&-(#-3-4)<=30&&4>1&&[1,2,4] Contain 4 && ADD(1,2)!=1 && user.name=='kiteee' && user_count>20`
 	//exprs = `-------1`
 	//exprs=`user.name=='kiteee' && user_count>20`
 	//exprs=`user_count>20 && user_count>20`

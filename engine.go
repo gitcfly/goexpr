@@ -74,6 +74,9 @@ func (en *Engine) SetPriority(infix string, priority int32) {
 
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expressionV2(expression)
+	for _, v := range exprs {
+		fmt.Println(v.Value + "   " + v.Type)
+	}
 	numbs := lls.New()
 	operas := lls.New()
 	for _, expr := range exprs {
@@ -172,15 +175,6 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		if len(exprList) > 0 {
 			pToken = exprList[len(exprList)-1]
 		}
-		if string(exprs[idx]) == Sub {
-			idx += 1
-			if eng.IsOpToken(pToken) {
-				exprList = append(exprList, &Token{Value: Sub, Type: PreOp})
-				continue
-			}
-			exprList = append(exprList, &Token{Value: Sub, Type: InfxOp})
-			continue
-		}
 		if strings.HasPrefix(exprs[idx:], "'") {
 			end := strings.Index(exprs[idx+1:], "'")
 			str := exprs[idx : idx+end+2]
@@ -210,7 +204,7 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		if expr := varReg.FindString(exprs[idx:]); expr != "" {
 			// 变量名或者函数名或者一元操作或者二元操作
 			idx += len(expr)
-			exprList = append(exprList, eng.GetToken(expr))
+			exprList = append(exprList, eng.GetToken(pToken, expr))
 			continue
 		}
 		var opera string
@@ -222,7 +216,7 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		}
 		if opera != "" {
 			idx += len(opera)
-			exprList = append(exprList, eng.GetToken(opera))
+			exprList = append(exprList, eng.GetToken(pToken, opera))
 			continue
 		}
 		exprList = append(exprList, &Token{Value: exprs[idx:]})
@@ -231,18 +225,21 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 	return exprList
 }
 
-func (eng *Engine) GetToken(expr string) *Token {
+func (eng *Engine) GetToken(pToken *Token, expr string) *Token {
 	if expr == "" {
 		return nil
+	}
+	if eng.IsOpToken(pToken) && eng.prefixSet[expr] != nil {
+		return &Token{Value: expr, Type: PreOp}
 	}
 	if eng.functionSet[expr] != nil {
 		return &Token{Value: expr, Type: Func}
 	}
-	if eng.prefixSet[expr] != nil {
-		return &Token{Value: expr, Type: PreOp}
-	}
 	if eng.infixSet[expr] != nil {
 		return &Token{Value: expr, Type: InfxOp}
+	}
+	if eng.prefixSet[expr] != nil {
+		return &Token{Value: expr, Type: PreOp}
 	}
 	return &Token{Value: expr, Type: Variable}
 }
