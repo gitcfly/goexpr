@@ -174,7 +174,7 @@ func (eng *Engine) expressionV2(exprs string) []*Token {
 		}
 		if string(exprs[idx]) == Sub {
 			idx += 1
-			if eng.IsPrefixOp(pToken) {
+			if eng.IsOpToken(pToken) {
 				exprList = append(exprList, &Token{Value: Sub, Type: PreOp})
 				continue
 			}
@@ -247,7 +247,7 @@ func (eng *Engine) GetToken(expr string) *Token {
 	return &Token{Value: expr, Type: Variable}
 }
 
-func (eng *Engine) IsPrefixOp(tk *Token) bool {
+func (eng *Engine) IsOpToken(tk *Token) bool {
 	if tk == nil {
 		return true
 	}
