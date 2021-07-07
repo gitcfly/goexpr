@@ -74,9 +74,6 @@ func (en *Engine) SetPriority(infix string, priority int32) {
 
 func (en *Engine) Execute(expression string, args map[string]interface{}) interface{} {
 	exprs := en.expressionV2(expression)
-	for _, v := range exprs {
-		fmt.Println(v.Value + "   " + v.Type)
-	}
 	numbs := lls.New()
 	operas := lls.New()
 	for _, expr := range exprs {
